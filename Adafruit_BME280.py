@@ -25,7 +25,6 @@
 import logging
 import time
 
-
 # BME280 default address.
 BME280_I2CADDR = 0x77
 
@@ -87,11 +86,10 @@ BME280_REGISTER_CONTROL = 0xF4
 BME280_REGISTER_CONFIG = 0xF5
 BME280_REGISTER_DATA = 0xF7
 
-
 class BME280(object):
     def __init__(self, t_mode=BME280_OSAMPLE_1, p_mode=BME280_OSAMPLE_1, h_mode=BME280_OSAMPLE_1,
                  standby=BME280_STANDBY_250, filter=BME280_FILTER_off, address=BME280_I2CADDR, i2c=None,
-                 **kwargs):
+                 spi_bus=None, spi_dev=None,**kwargs):
         self._logger = logging.getLogger('Adafruit_BMP.BMP085')
         # Check that t_mode is valid.
         if t_mode not in [BME280_OSAMPLE_1, BME280_OSAMPLE_2, BME280_OSAMPLE_4,
@@ -123,15 +121,18 @@ class BME280(object):
                 'Unexpected filter value {0}.'.format(filter))
         self._filter = filter
         # Create I2C device.
-        if i2c is None:
+        if spi_bus is not None and spi_dev is not None:
+            import _spidev
+            self._device = _spidev.Device(spi_bus,spi_dev)
+        elif i2c is None:
             import Adafruit_GPIO.I2C as I2C
             i2c = I2C
-        # Create device, catch permission errors
-        try:
-            self._device = i2c.get_i2c_device(address, **kwargs)
-        except IOError:
-            print("Unable to communicate with sensor, check permissions.")
-            exit()
+            # Create device, catch permission errors
+            try:
+                self._device = i2c.get_i2c_device(address, **kwargs)
+            except IOError:
+                print("Unable to communicate with sensor, check permissions.")
+                exit()
         # Load calibration values.
         self._load_calibration()
         self._device.write8(BME280_REGISTER_CONTROL, 0x24)  # Sleep mode
@@ -144,22 +145,22 @@ class BME280(object):
 
     def _load_calibration(self):
 
-        self.dig_T1 = self._device.readU16LE(BME280_REGISTER_DIG_T1)
-        self.dig_T2 = self._device.readS16LE(BME280_REGISTER_DIG_T2)
-        self.dig_T3 = self._device.readS16LE(BME280_REGISTER_DIG_T3)
+        self.dig_T1 = self._device.readU16BE(BME280_REGISTER_DIG_T1)
+        self.dig_T2 = self._device.readS16BE(BME280_REGISTER_DIG_T2)
+        self.dig_T3 = self._device.readS16BE(BME280_REGISTER_DIG_T3)
 
-        self.dig_P1 = self._device.readU16LE(BME280_REGISTER_DIG_P1)
-        self.dig_P2 = self._device.readS16LE(BME280_REGISTER_DIG_P2)
-        self.dig_P3 = self._device.readS16LE(BME280_REGISTER_DIG_P3)
-        self.dig_P4 = self._device.readS16LE(BME280_REGISTER_DIG_P4)
-        self.dig_P5 = self._device.readS16LE(BME280_REGISTER_DIG_P5)
-        self.dig_P6 = self._device.readS16LE(BME280_REGISTER_DIG_P6)
-        self.dig_P7 = self._device.readS16LE(BME280_REGISTER_DIG_P7)
-        self.dig_P8 = self._device.readS16LE(BME280_REGISTER_DIG_P8)
-        self.dig_P9 = self._device.readS16LE(BME280_REGISTER_DIG_P9)
+        self.dig_P1 = self._device.readU16BE(BME280_REGISTER_DIG_P1)
+        self.dig_P2 = self._device.readS16BE(BME280_REGISTER_DIG_P2)
+        self.dig_P3 = self._device.readS16BE(BME280_REGISTER_DIG_P3)
+        self.dig_P4 = self._device.readS16BE(BME280_REGISTER_DIG_P4)
+        self.dig_P5 = self._device.readS16BE(BME280_REGISTER_DIG_P5)
+        self.dig_P6 = self._device.readS16BE(BME280_REGISTER_DIG_P6)
+        self.dig_P7 = self._device.readS16BE(BME280_REGISTER_DIG_P7)
+        self.dig_P8 = self._device.readS16BE(BME280_REGISTER_DIG_P8)
+        self.dig_P9 = self._device.readS16BE(BME280_REGISTER_DIG_P9)
 
         self.dig_H1 = self._device.readU8(BME280_REGISTER_DIG_H1)
-        self.dig_H2 = self._device.readS16LE(BME280_REGISTER_DIG_H2)
+        self.dig_H2 = self._device.readS16BE(BME280_REGISTER_DIG_H2)
         self.dig_H3 = self._device.readU8(BME280_REGISTER_DIG_H3)
         self.dig_H6 = self._device.readS8(BME280_REGISTER_DIG_H7)
 
