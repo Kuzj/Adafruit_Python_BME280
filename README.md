@@ -1,3 +1,8 @@
+Python BME280 library for SPI, I2C. For SPI required spidev module.
+```
+pip install spidev
+```
+
 DEPRECATED LIBRARY  Adafruit_Python_BME280
 ===================
 
