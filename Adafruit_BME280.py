@@ -328,7 +328,7 @@ class BME280(object):
             else:
                 self._ok = False
             pressure = self.read_pressure()
-            if (pressure) > 100 and (pressure<1100):
+            if (pressure > 30000) and (pressure<110000):
                 self._pressure = pressure
             else:
                 self._ok = False
