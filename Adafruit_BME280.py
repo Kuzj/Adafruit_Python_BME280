@@ -86,6 +86,9 @@ BME280_REGISTER_CONTROL = 0xF4
 BME280_REGISTER_CONFIG = 0xF5
 BME280_REGISTER_DATA = 0xF7
 
+class BME280ReadError(Exception):
+    pass
+
 class BME280(object):
     def __init__(self, t_mode=BME280_OSAMPLE_1, p_mode=BME280_OSAMPLE_1, h_mode=BME280_OSAMPLE_1,
                  standby=BME280_STANDBY_250, filter=BME280_FILTER_off, address=BME280_I2CADDR, i2c=None,
@@ -123,7 +126,9 @@ class BME280(object):
         # Create I2C device.
         if spi_bus is not None and spi_dev is not None:
             import _spidev
-            self._device = _spidev.Device(spi_bus,spi_dev)
+            self._spi_bus = int(spi_bus)
+            self._spi_dev = int(spi_dev)
+            self._device = _spidev.Device(self._spi_bus,self._spi_dev)
         elif i2c is None:
             import Adafruit_GPIO.I2C as I2C
             i2c = I2C
@@ -142,6 +147,11 @@ class BME280(object):
         self._device.write8(BME280_REGISTER_CONTROL_HUM, h_mode)  # Set Humidity Oversample
         self._device.write8(BME280_REGISTER_CONTROL, ((t_mode << 5) | (p_mode << 2) | 3))  # Set Temp/Pressure Oversample and enter Normal mode
         self.t_fine = 0.0
+        self._humidity = None
+        self._temperature = None
+        self._pressure = None
+        self._ok = None
+        self.update()
 
     def _load_calibration(self):
 
@@ -190,8 +200,11 @@ class BME280(object):
         """Waits for reading to become available on device."""
         """Does a single burst read of all data values from device."""
         """Returns the raw (uncompensated) temperature from the sensor."""
+        attempts = 0
         while (self._device.readU8(BME280_REGISTER_STATUS) & 0x08):    # Wait for conversion to complete (TODO : add timeout)
             time.sleep(0.002)
+            attempts+=1
+            if attempts>10: raise BME280ReadError('read_raw_temp')
         self.BME280Data = self._device.readList(BME280_REGISTER_DATA, 8)
         raw = ((self.BME280Data[3] << 16) | (self.BME280Data[4] << 8) | self.BME280Data[5]) >> 4
         return raw
@@ -278,3 +291,46 @@ class BME280(object):
         dewpoint_c = self.read_dewpoint()
         dewpoint_f = dewpoint_c * 1.8 + 32
         return dewpoint_f
+    
+    @property
+    def temperature(self):
+        """Return temperature in celsius."""
+        return self._temperature
+
+    @property
+    def humidity(self):
+        """Return relative humidity in percentage."""
+        return self._humidity
+
+    @property
+    def pressure(self):
+        """Return pressure in hPa."""
+        hectopascals = self._pressure / 100
+        return hectopascals
+
+    @property
+    def sample_ok(self):
+        return self._ok
+    
+
+    def update(self):
+        """Read raw data and update compensated variables."""
+        try:
+            temperature = self.read_temperature()
+            if (temperature >= -40) and (temperature < 80):
+                self._temperature = temperature
+                self._ok = True
+            else:
+                self._ok = False
+            humidity = self.read_humidity()
+            if (humidity >= 0) and (humidity <= 100):
+                self._humidity = humidity
+            else:
+                self._ok = False
+            pressure = self.read_pressure()
+            if (pressure) > 100 and (pressure<1100):
+                self._pressure = pressure
+            else:
+                self._ok = False
+        except BME280ReadError:
+            self._ok = False
